@@ -26,53 +26,16 @@ class PoGoApi(object):
         provider, username, password = self.provider, self.username, self.password
         return self._api.login(provider, username, password, app_simulation=True)
 
-        # TODO: Figure out why the below doesn't work
-        """
-        if provider == 'ptc':
-            self._api._auth_provider = AuthPtc()
-        elif provider == 'google':
-            self._api._auth_provider = AuthGoogle()
-
-        if not self._api._auth_provider.login(username, password):
-            print("Failed")
-            return False
-
-        # making a standard call, like it is also done by the client
-        self.get_player()
-        self.get_hatched_eggs()
-        self.get_inventory()
-        self.check_awarded_badges()
-        self.download_settings(hash="05daf51635c82611d1aac95c0b051d3ec088a930")
-
-        response = self.call(ignore_expiration=True, ignore_cache=True)
-        print(response)
-
-        if response is None:
-            return False
-
-        if 'api_url' in response:
-            self._api._api_endpoint = ('https://{}/rpc'.format(response['api_url']))
-            print("setting api_url")
-        else:
-            print("unexpected response")
-            return False
-
-        if 'auth_ticket' in response:
-            self._auth_provider.set_ticket(response['auth_ticket'].values())
-            print("setting auth ticket")
-
-        return True
-        """
-
     def set_position(self, lat, lng, alt):
         self._api.set_position(lat, lng, alt)
 
     def get_position(self):
         return self._api.get_position()
 
-    def get_rpc_methods(self):
+    def get_queued_methods(self):
         return self._api.list_curr_methods()
 
+    # Lazily queue RPC functions to be called. These will be filtered later.
     def __getattr__(self, func):
         def function(*args, **kwargs):
             func_name = str(func).upper()
@@ -85,24 +48,33 @@ class PoGoApi(object):
 
     def get_expiration_time(self):
         ticket = self._api._auth_provider.get_ticket()
-        if ticket is False:
+        if ticket is False or ticket is None:
             return 0
         for field in ticket:
             if isinstance(field, int):
                 return int(field/1000 - time.time())
         return 0
 
+    # Wrapper for new PGoApi create_request() function
     def create_request(self):
         return self._api.create_request()
 
     def call(self, ignore_expiration=False, ignore_cache=False):
         methods, method_keys, self._pending_calls, self._pending_calls_keys = self._pending_calls, self._pending_calls_keys, {}, []
+
+        # Check for ticket expiration before continuing
         if self.get_expiration_time() < 60 and ignore_expiration is False:
             print("[API] Token has expired, attempting to log back in...")
-            while self.login() is False:
-                print("[API] Failed to login. Waiting 15 seconds...")
-                time.sleep(15)
+            for _ in range(10):
+                if self.login() is False:
+                    print("[API] Failed to login. Waiting 15 seconds...")
+                    time.sleep(15)
+            if self.get_expiration_time() < 60 and ignore_expiration is False:
+                print("[API] Failed to login after 10 tries, exiting.")
+                exit(1)
 
+        # See which methods are uncached
+        # If all methods are cached and do not invalidate any states, we can just return current state
         uncached_method_keys = self.state.filter_cached_methods(method_keys) if ignore_cache is False else method_keys
         if len(uncached_method_keys) == 0:
             return self.state.get_state()
@@ -111,6 +83,7 @@ class PoGoApi(object):
 
             request = self._api.create_request()
 
+            # build the request
             for method in uncached_method_keys:
                 my_args, my_kwargs = methods[method]
                 getattr(request, method)(*my_args, **my_kwargs)
@@ -118,6 +91,7 @@ class PoGoApi(object):
             try:
                 results = request.call()
             except ServerSideRequestThrottlingException:
+                # status code 52: too many requests
                 print("[API] Requesting too fast. Retrying in 5 seconds...")
                 time.sleep(5)
                 continue
@@ -126,13 +100,13 @@ class PoGoApi(object):
                 print("[API] API call failed. Retrying in 5 seconds...")
                 time.sleep(5)
             else:
+                # status code 1: success
                 with open('api-test.txt', 'w') as f:
                     f.write(str(results))
-                #print(results)
-                #return results
 
                 self.state.mark_stale(methods)
 
+                # Transform our responses and return our current state
                 responses = results.get("responses", {})
                 for key in responses:
                     self.state.update_with_response(key, responses[key])

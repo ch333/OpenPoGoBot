@@ -7,17 +7,21 @@ class StateManager(object):
 
     def __init__(self):
 
+        # Transforms response data from the server to objects.
+        # Use self._noop if there is no response data.
         self.response_map = {
             "GET_PLAYER": self._parse_player,
             "GET_INVENTORY": self._parse_inventory,
             "GET_MAP_OBJECTS": self._parse_map,
             "ENCOUNTER": self._parse_encounter,
-            "RELEASE_POKEMON": self._parse_noop,
+            "RELEASE_POKEMON": self._noop,
             "CATCH_POKEMON": self._parse_catch_pokemon,
             "PLAYER_UPDATE": self._parse_noop,
             "FORT_DETAILS": self._parse_fort,
         }
 
+        # Maps methods to the state objects that they refresh.
+        # Used for caching.
         self.method_returns_states = {
             "GET_PLAYER": ["player"],
             "GET_INVENTORY": ["player", "inventory", "pokemon", "pokedex", "candy", "eggs"],
@@ -32,9 +36,12 @@ class StateManager(object):
             "FORT_SEARCH": []
         }
 
+        # Maps methods to the state objects that they invalidate.
+        # (ie. require another API call to get the correct data)
+        # Used for caching.
         self.method_mutates_states = {
-            "GET_PLAYER": ["player"],
-            "GET_INVENTORY": ["player", "inventory", "pokemon", "pokedex", "candy", "eggs"],
+            "GET_PLAYER": [],
+            "GET_INVENTORY": [],
             "CHECK_AWARDED_BADGES": [],
             "DOWNLOAD_SETTINGS": [],
             "GET_HATCHED_EGGS": [],
@@ -51,16 +58,24 @@ class StateManager(object):
 
         self.staleness = {}
 
+    def _noop(self, *args, **kwargs):
+        pass
+
     def is_stale(self, key):
         return self.staleness.get(key, True)
 
-    def is_state_cached(self, method):
+    # Check whether a method is cached or if it needs to be updated.
+    def is_method_cached(self, method):
         affected_states = self.method_returns_states[method]
         for state in affected_states:
             if self.is_stale(state):
                 return False
         return True
 
+    # Filter the list of methods so that only uncached methods (or methods that will become
+    # uncached) and state-invalidating methods will be called. Note that the order is
+    # important - calling GET_INVENTORY before FORT_SEARCH, for example, will return the cached
+    # and now invalidated inventory  object. To fix, call FORT_SEARCH and then GET_INVENTORY.
     def filter_cached_methods(self, method_keys):
         will_be_stale = {}
         uncached_methods = []
@@ -81,6 +96,7 @@ class StateManager(object):
         return uncached_methods
             
 
+    # Update a state object and mark it as valid.
     def _update_state(self, data):
         for key in data:
             value = data.get(key, None)
@@ -92,18 +108,22 @@ class StateManager(object):
     def get_state(self):
         return self.current_state
 
+    # Get only the following state objects from the current state.
     def get_state_filtered(self, keys):
         return_object = {}
         for key in keys:
             return_object[key] = self.current_state.get(key, None)
         return self.current_state
 
+    # Mark the states affected by the given methods as invalid/stale.
     def mark_stale(self, methods):
         for method in methods:
             #for state in self.method_mutates_states.get(method, []):
             for state in self.method_mutates_states[method]:
                 self.staleness[method] = True
 
+    # Transform the returned data from the server into data objects and
+    # then update the current state.
     def update_with_response(self, key, response):
         print("Mutating state for " + key)
         if key not in self.response_map:
@@ -138,6 +158,8 @@ class StateManager(object):
         self._update_state(new_state)
 
     def _parse_map(self, response):
+        # TODO: Figure out how I want to do WorldMap. Lazy loading might
+        # be a better idea
         """
         current_map = self.current_state.get("worldmap", None)
         if current_map is None:
@@ -155,9 +177,6 @@ class StateManager(object):
             current_encounter = Encounter()
         current_encounter.update_encounter(response)
         self._update_state({"encounter": current_encounter})
-
-    def _parse_noop(self, response):
-        pass
 
     def _parse_catch_pokemon(self, response):
         current_encounter = self.current_state.get("encounter", None)
