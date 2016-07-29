@@ -106,7 +106,6 @@ class PokemonCatchWorker(object):
             logger.log('[x] Pokemon Bag is full!', 'red')
             return self.BAG_FULL
         elif status is 1:
-            combat_power = 0
             pokemon = encounter.wild_pokemon
 
             if pokemon is None:
