@@ -2,12 +2,18 @@
 
 from datetime import datetime
 from math import ceil
+from typing import Optional, List
 import json
+<<<<<<< 05f8f132274ab4466d0b205458bc992e653424e3
 import googlemaps
 from s2sphere import CellId, LatLng
 from pgoapi.utilities import f2i
+=======
+
+from s2sphere import CellId, LatLng # type: ignore
+>>>>>>> Refactor step 3
 from pokemongo_bot.human_behaviour import sleep, random_lat_long_delta
-from pokemongo_bot.utils import distance, format_time, convert_to_utf8
+from pokemongo_bot.utils import distance, format_time, f2i
 import pokemongo_bot.logger as logger
 
 
@@ -17,7 +23,7 @@ class Stepper(object):
 
     def __init__(self, bot):
         self.bot = bot
-        self.api = bot.api
+        self.api_wrapper = bot.api_wrapper
         self.config = bot.config
 
         self.pos = 1
@@ -32,14 +38,15 @@ class Stepper(object):
             self.first_step = False
             position = (self.origin_lat, self.origin_lon, 0.0)
         else:
-            position_lat, position_lng, _ = self.api.get_position()
+            position_lat, position_lng, _ = self.api_wrapper.get_position()
             position = (position_lat, position_lng, 0.0)
 
-        self.api.set_position(*position)
+        self.api_wrapper.set_position(*position)
         self._work_at_position(position[0], position[1], True)
         sleep(5)
 
     def walk_to(self, speed, lat, lng, alt):
+<<<<<<< 05f8f132274ab4466d0b205458bc992e653424e3
         position_lat, position_lng, _ = self.api.get_position()
 
         # ask google for directions
@@ -78,6 +85,10 @@ class Stepper(object):
         # type: (float, float, float, float, float, float, float) -> None
 
         dist = distance(from_lat, from_lng, to_lat, to_lng)
+=======
+        position_lat, position_lng, _ = self.api_wrapper.get_position()
+        dist = distance(position_lat, position_lng, lat, lng)
+>>>>>>> Refactor step 3
         steps = (dist / (self.AVERAGE_STRIDE_LENGTH_IN_METRES * speed))
 
         logger.log("[#] Walking from " + str((from_lat, from_lng)) + " to " + str(str((to_lat, to_lng))) + " for approx. " + str(format_time(ceil(steps))))
@@ -86,21 +97,29 @@ class Stepper(object):
             d_long = (to_lng - from_lng) / steps
 
             for _ in range(int(steps)):
+<<<<<<< 05f8f132274ab4466d0b205458bc992e653424e3
                 position_lat, position_lng, _ = self.api.get_position()
                 c_lat = position_lat + d_lat + random_lat_long_delta(delta_factor)
                 c_long = position_lng + d_long + random_lat_long_delta(delta_factor)
                 self.api.set_position(c_lat, c_long, alt)
+=======
+                position_lat, position_lng, _ = self.api_wrapper.get_position()
+                c_lat = position_lat + d_lat + random_lat_long_delta()
+                c_long = position_lng + d_long + random_lat_long_delta()
+                self.api_wrapper.set_position(c_lat, c_long, alt)
+>>>>>>> Refactor step 3
 
                 self.bot.heartbeat()
                 sleep(1)  # sleep one second plus a random delta
 
-                position_lat, position_lng, _ = self.api.get_position()
+                position_lat, position_lng, _ = self.api_wrapper.get_position()
                 self._work_at_position(position_lat, position_lng, False)
 
             self.bot.heartbeat()
 
     def _get_cell_id_from_latlong(self, radius=10):
-        position_lat, position_lng, _ = self.api.get_position()
+        # type: (Optional[float]) -> List[str]
+        position_lat, position_lng, _ = self.api_wrapper.get_position()
         origin = CellId.from_lat_lng(LatLng.from_degrees(position_lat, position_lng)).parent(15)
         walk = [origin.id()]
 
@@ -115,14 +134,15 @@ class Stepper(object):
         return sorted(walk)
 
     def _work_at_position(self, lat, lng, pokemon_only=False):
+        # type: (float, float, Optional[bool]) -> None
         cell_id = self._get_cell_id_from_latlong()
         timestamp = [0, ] * len(cell_id)
-        self.api.get_map_objects(latitude=f2i(lat),
+        self.api_wrapper.get_map_objects(latitude=f2i(lat),
                                  longitude=f2i(lng),
                                  since_timestamp_ms=timestamp,
                                  cell_id=cell_id)
 
-        response_dict = self.api.call()
+        response_dict = self.api_wrapper.call()
         if response_dict is None:
             return
         # Passing data through last-location and location

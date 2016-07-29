@@ -1,14 +1,13 @@
-import json
-
-from pokemongo_bot.human_behaviour import sleep
 from pokemongo_bot import logger
+from pokemongo_bot.human_behaviour import sleep
 
 
 class InitialTransferWorker(object):
     def __init__(self, bot):
+        # type: (PokemonGoBot) -> None
         self.config = bot.config
         self.pokemon_list = bot.pokemon_list
-        self.api = bot.api
+        self.api_wrapper = bot.api_wrapper
 
     def work(self):
         logger.log('[x] Initial Transfer.')
@@ -40,11 +39,7 @@ class InitialTransferWorker(object):
                         continue
 
                     logger.log('[x] Transferring #{} ({}) with CP {}'.format(group_id, pokemon_name, group_cp[i]))
-                    self.api.release_pokemon(pokemon_id=pokemon_groups[group_id][group_cp[i]])
-
-                    # Not using the response from API at the moment; commenting out to pass pylint
-                    # response_dict = self.api.call()
-                    self.api.call()
+                    self.api_wrapper.release_pokemon(pokemon_id=pokemon_groups[group_id][group_cp[i]]).call()
 
                     sleep(2)
 
@@ -52,8 +47,8 @@ class InitialTransferWorker(object):
 
     def _initial_transfer_get_groups(self):
         pokemon_groups = {}
-        self.api.get_player().get_inventory()
-        response_dict = self.api.call()
+        self.api_wrapper.get_player().get_inventory()
+        response_dict = self.api_wrapper.call()
         inventory, pokemon_list = response_dict['inventory'], response_dict['pokemon']
         """
         inventory_dict = inventory_req['responses']['GET_INVENTORY']['inventory_delta']['inventory_items']

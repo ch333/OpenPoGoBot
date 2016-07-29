@@ -1,7 +1,7 @@
 from .pokemon import Egg, Pokemon
 
-class Inventory(object):
 
+class Inventory(object):
     def __init__(self, data):
         data = data.get("inventory_delta", {})
         self.last_updated = data.get("new_timestamp_ms", 0)
@@ -29,7 +29,7 @@ class Inventory(object):
             elif "item" in item:
                 num_item = item["item"].get("count", 0)
                 item_id = item["item"].get("item_id", 0)
-                #unseen = item["item"].get("unseen", False)
+                # unseen = item["item"].get("unseen", False)
                 if num_item == 0 or item_id == 0:
                     continue
 

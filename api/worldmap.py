@@ -1,15 +1,16 @@
 class Fort(object):
-
     def __init__(self, data):
         self.fort_id = data.get("id", "")
+        self.fort_name = data.get("name", "Unknown")
         self.latitude = data.get("latitude", None)
         self.longitude = data.get("longitude", None)
         self.enabled = data.get("enabled", 1)
         self.last_modified_timestamp_ms = data.get("last_modified_timestamp_ms", 0)
+        self.complete_cooldown_timestamp_ms = data.get("complete_cooldown_timestamp_ms", 0)
         self.fort_type = data.get("type", 0)
 
-class PokeStop(Fort):
 
+class PokeStop(Fort):
     def __init__(self, data):
         super(PokeStop, self).__init__(data)
         self.active_fort_modifier = data.get("active_fort_modifier", "")
@@ -36,8 +37,8 @@ class PokeStop(Fort):
                "type":1
         """
 
-class Gym(Fort):
 
+class Gym(Fort):
     def __init__(self, data):
         super(Gym, self).__init__(data)
 
@@ -60,8 +61,8 @@ class Gym(Fort):
                "is_in_battle":1
         """
 
-class Cell(object):
 
+class Cell(object):
     def __init__(self, data):
         self.spawn_points = []
         self.gyms = []
@@ -84,14 +85,12 @@ class Cell(object):
             else:
                 self.gyms.append(Gym(fort))
 
-class WorldMap(object):
 
+class WorldMap(object):
     def __init__(self):
         self.cells = []
 
     def update_map_objects(self, data):
-        #self.data = data
-        # Patch this up later
         cells = data.get("map_cells", [])
         for cell_data in cells:
             cell = Cell(cell_data)

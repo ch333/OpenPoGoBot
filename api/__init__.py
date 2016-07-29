@@ -1,13 +1,10 @@
-from pgoapi import PGoApi
-from pgoapi.exceptions import ServerSideRequestThrottlingException
-from pgoapi.auth_ptc import AuthPtc
-from pgoapi.auth_google import AuthGoogle
+from pgoapi import PGoApi                                           # type: ignore
+from pgoapi.exceptions import ServerSideRequestThrottlingException  # type: ignore
 import time
-import json
 from .state_manager import StateManager
 
-class PoGoApi(object):
 
+class PoGoApi(object):
     def __init__(self, provider="google", username="", password=""):
         self._api = PGoApi()
 
@@ -15,7 +12,7 @@ class PoGoApi(object):
         self.username = username
         self.password = password
 
-        self.current_position = (0,0,0)
+        self.current_position = (0, 0, 0)
 
         self.state = StateManager()
 
@@ -39,7 +36,6 @@ class PoGoApi(object):
     def __getattr__(self, func):
         def function(*args, **kwargs):
             func_name = str(func).upper()
-            print("[API] Queueing " + func_name)
             self._pending_calls[func_name] = (args, kwargs)
             self._pending_calls_keys.append(func_name)
             return self
@@ -52,7 +48,7 @@ class PoGoApi(object):
             return 0
         for field in ticket:
             if isinstance(field, int):
-                return int(field/1000 - time.time())
+                return int(field / 1000 - time.time())
         return 0
 
     # Wrapper for new PGoApi create_request() function
@@ -92,8 +88,12 @@ class PoGoApi(object):
                 results = request.call()
             except ServerSideRequestThrottlingException:
                 # status code 52: too many requests
-                print("[API] Requesting too fast. Retrying in 5 seconds...")
-                time.sleep(5)
+                print("[API] Requesting too fast. Retrying in 15 seconds...")
+                time.sleep(15)
+                continue
+            except TypeError:
+                print("[API] Failed to perform API call (servers might be offline). Retrying in 15 seconds...")
+                time.sleep(15)
                 continue
 
             if results is False or results is None or results.get('status_code', 1) != 1:
@@ -104,7 +104,7 @@ class PoGoApi(object):
                 with open('api-test.txt', 'w') as f:
                     f.write(str(results))
 
-                self.state.mark_stale(methods)
+                self.state.mark_stale(uncached_method_keys)
 
                 # Transform our responses and return our current state
                 responses = results.get("responses", {})
@@ -112,4 +112,3 @@ class PoGoApi(object):
                     self.state.update_with_response(key, responses[key])
                 return self.state.get_state()
         return None
-

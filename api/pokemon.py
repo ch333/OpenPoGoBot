@@ -1,11 +1,4 @@
 class Egg(object):
-    """
-     'captured_cell_id':1234567890,
-     'is_egg':True,
-     'id':1234567890,
-     'egg_km_walked_target':5.0,
-     'creation_time_ms':1234567890
-    """
 
     def __init__(self, data):
         self.unique_id = data.get("id", 0)
@@ -17,26 +10,8 @@ class Egg(object):
     def __repr__(self):
         return str(self.__dict__)
 
-class Pokemon(object):
 
-    """
-     'move_2':26,
-     'individual_defense':4,
-     'stamina_max':18,
-     'pokeball':1,
-     'pokemon_id':27,
-     'creation_time_ms':1234567890,
-     'individual_attack':4,
-     'move_1':216,
-     'captured_cell_id':1234567890,
-     'id':1234567890,
-     'cp':30,
-     'cp_multiplier':0.1234567890,
-     'stamina':18,
-     'height_m':0.1234567890,
-     'weight_kg':1.23456790,
-     'individual_stamina':14
-    """
+class Pokemon(object):
 
     def __init__(self, data):
         self.unique_id = data.get("id", 0)

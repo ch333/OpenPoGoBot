@@ -3,8 +3,8 @@ from .inventory import Inventory
 from .worldmap import WorldMap, Gym, PokeStop
 from .encounter import Encounter
 
-class StateManager(object): 
 
+class StateManager(object):
     def __init__(self):
 
         # Transforms response data from the server to objects.
@@ -16,8 +16,9 @@ class StateManager(object):
             "ENCOUNTER": self._parse_encounter,
             "RELEASE_POKEMON": self._noop,
             "CATCH_POKEMON": self._parse_catch_pokemon,
-            "PLAYER_UPDATE": self._parse_noop,
+            "PLAYER_UPDATE": self._noop,
             "FORT_DETAILS": self._parse_fort,
+            "FORT_SEARCH": self._identity,
         }
 
         # Maps methods to the state objects that they refresh.
@@ -38,6 +39,8 @@ class StateManager(object):
 
         # Maps methods to the state objects that they invalidate.
         # (ie. require another API call to get the correct data)
+        # If a method needs to always be called, ensure that it
+        # mutates at least one state.
         # Used for caching.
         self.method_mutates_states = {
             "GET_PLAYER": [],
@@ -91,10 +94,7 @@ class StateManager(object):
                     if self.is_stale(state) or will_be_stale.get(state, False):
                         uncached_methods.append(method)
                         break
-            if method not in uncached_methods:
-                print("Method " + method + " is cached, using cached data")
         return uncached_methods
-            
 
     # Update a state object and mark it as valid.
     def _update_state(self, data):
@@ -118,36 +118,35 @@ class StateManager(object):
     # Mark the states affected by the given methods as invalid/stale.
     def mark_stale(self, methods):
         for method in methods:
-            #for state in self.method_mutates_states.get(method, []):
+            # for state in self.method_mutates_states.get(method, []):
             for state in self.method_mutates_states[method]:
-                self.staleness[method] = True
+                self.staleness[state] = True
 
     # Transform the returned data from the server into data objects and
     # then update the current state.
     def update_with_response(self, key, response):
-        print("Mutating state for " + key)
         if key not in self.response_map:
             print(response)
             print("Unimplemented response " + key)
-        self.response_map[key](response)
+        self.response_map[key](key, response)
 
-    def _parse_player(self, response):
+    def _parse_player(self, key, response):
         current_player = self.current_state.get("player", None)
         if current_player is None:
             current_player = Player()
         current_player.update_get_player(response)
         self._update_state({"player": current_player})
 
-    def _parse_inventory(self, response):
+    def _parse_inventory(self, key, response):
         new_inventory = Inventory(response)
 
-        new_state = {}
-
-        new_state["inventory"] = new_inventory.items
-        new_state["pokedex"] = new_inventory.pokedex_entries
-        new_state["candy"] = new_inventory.candy
-        new_state["pokemon"] = new_inventory.pokemon
-        new_state["eggs"] = new_inventory.eggs
+        new_state = {
+            "inventory": new_inventory.items,
+            "pokedex": new_inventory.pokedex_entries,
+            "candy": new_inventory.candy,
+            "pokemon": new_inventory.pokemon,
+            "eggs": new_inventory.eggs
+        }
 
         current_player = self.current_state.get("player", None)
         if current_player is None:
@@ -157,7 +156,7 @@ class StateManager(object):
 
         self._update_state(new_state)
 
-    def _parse_map(self, response):
+    def _parse_map(self, key, response):
         # TODO: Figure out how I want to do WorldMap. Lazy loading might
         # be a better idea
         """
@@ -171,23 +170,26 @@ class StateManager(object):
 
         self._update_state({"worldmap": current_map})
 
-    def _parse_encounter(self, response):
+    def _parse_encounter(self, key, response):
         current_encounter = self.current_state.get("encounter", None)
         if current_encounter is None:
             current_encounter = Encounter()
         current_encounter.update_encounter(response)
         self._update_state({"encounter": current_encounter})
 
-    def _parse_catch_pokemon(self, response):
+    def _parse_catch_pokemon(self, key, response):
         current_encounter = self.current_state.get("encounter", None)
         if current_encounter is None:
-            current_encounter = Encounter(response)
+            current_encounter = Encounter()
         current_encounter.update_catch_pokemon(response)
         self._update_state({"encounter": current_encounter})
 
-    def _parse_fort(self, response):
+    def _parse_fort(self, key, response):
         fort_type = response.get("type", 2)
         if fort_type == 2:
             self._update_state({"fort": Gym(response)})
         else:
             self._update_state({"fort": PokeStop(response)})
+
+    def _identity(self, key, response):
+        self._update_state({key: response})
