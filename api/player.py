@@ -38,6 +38,7 @@ class Player(object):
         self.level = 1
 
     def update_get_player(self, data):
+        data = data.get("player_data", {})
         self.username = data.get("username", "Unknown")
         self.max_pokemon_storage = data.get("max_pokemon_storage", 250)
         self.max_item_storage = data.get("max_item_storage", 350)
@@ -45,11 +46,11 @@ class Player(object):
         self.update_currency(data.get("currencies", {}))
 
     def update_get_inventory_stats(self, data):
-        items = data.get("inventory_items", [])
+        items = data.get("inventory_delta", {}).get("inventory_items", [])
         for item in items:
             item = item.get("inventory_item_data", {})
-            if "player_data" in item:
-                item = item.get("player_data", {})
+            if "player_stats" in item:
+                item = item.get("player_stats", {})
                 self.km_walked = item.get("km_walked", 0.0)
                 self.pokeballs_thrown = item.get("pokeballs_thrown", 0)
                 self.unique_pokedex_entries = item.get("unique_pokedex_entries", 0)
@@ -70,3 +71,6 @@ class Player(object):
 
     def get_creation_date(self):
         creation_date = datetime.datetime.fromtimestamp(self.creation_timestamp_ms / 1e3)
+
+    def __repr__(self):
+        return str(self.__dict__)

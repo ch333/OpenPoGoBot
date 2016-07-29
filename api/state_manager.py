@@ -1,6 +1,7 @@
 from .player import Player
 from .inventory import Inventory
-from .worldmap import WorldMap 
+from .worldmap import WorldMap, Gym, PokeStop
+from .encounter import Encounter
 
 class StateManager(object): 
 
@@ -11,26 +12,39 @@ class StateManager(object):
             "GET_INVENTORY": self._parse_inventory,
             "GET_MAP_OBJECTS": self._parse_map,
             "ENCOUNTER": self._parse_encounter,
+            "RELEASE_POKEMON": self._parse_noop,
+            "CATCH_POKEMON": self._parse_catch_pokemon,
+            "PLAYER_UPDATE": self._parse_noop,
+            "FORT_DETAILS": self._parse_fort,
         }
 
         self.method_returns_states = {
             "GET_PLAYER": ["player"],
-            "GET_INVENTORY": ["player", "inventory", "pokemon", "pokedex"],
+            "GET_INVENTORY": ["player", "inventory", "pokemon", "pokedex", "candy", "eggs"],
             "CHECK_AWARDED_BADGES": [],
             "DOWNLOAD_SETTINGS": [],
             "GET_HATCHED_EGGS": [],
             "GET_MAP_OBJECTS": ["worldmap"],
             "ENCOUNTER": ["encounter"],
+            "RELEASE_POKEMON": [],
+            "PLAYER_UPDATE": [],
+            "FORT_DETAILS": ["fort"],
+            "FORT_SEARCH": []
         }
 
         self.method_mutates_states = {
-            "GET_PLAYER": [],
-            "GET_INVENTORY": [],
+            "GET_PLAYER": ["player"],
+            "GET_INVENTORY": ["player", "inventory", "pokemon", "pokedex", "candy", "eggs"],
             "CHECK_AWARDED_BADGES": [],
             "DOWNLOAD_SETTINGS": [],
             "GET_HATCHED_EGGS": [],
             "GET_MAP_OBJECTS": ["worldmap"],
-            "ENCOUNTER": ["encounter"]
+            "ENCOUNTER": ["encounter", "player", "pokedex"],
+            "RELEASE_POKEMON": ["pokemon", "candy"],
+            "CATCH_POKEMON": ["encounter", "player", "pokemon", "pokedex", "candy", "inventory"],
+            "PLAYER_UPDATE": ["player", "inventory"],
+            "FORT_DETAILS": ["fort"],
+            "FORT_SEARCH": ["player", "inventory", "eggs"]
         }
 
         self.current_state = {}
@@ -124,12 +138,37 @@ class StateManager(object):
         self._update_state(new_state)
 
     def _parse_map(self, response):
+        """
         current_map = self.current_state.get("worldmap", None)
         if current_map is None:
             current_map = WorldMap()
+        current_map.update_map_objects(response)
+        """
+        current_map = WorldMap()
         current_map.update_map_objects(response)
 
         self._update_state({"worldmap": current_map})
 
     def _parse_encounter(self, response):
-        self._update_state({"encounter": {"status": response.get("status", 0)}})
+        current_encounter = self.current_state.get("encounter", None)
+        if current_encounter is None:
+            current_encounter = Encounter()
+        current_encounter.update_encounter(response)
+        self._update_state({"encounter": current_encounter})
+
+    def _parse_noop(self, response):
+        pass
+
+    def _parse_catch_pokemon(self, response):
+        current_encounter = self.current_state.get("encounter", None)
+        if current_encounter is None:
+            current_encounter = Encounter(response)
+        current_encounter.update_catch_pokemon(response)
+        self._update_state({"encounter": current_encounter})
+
+    def _parse_fort(self, response):
+        fort_type = response.get("type", 2)
+        if fort_type == 2:
+            self._update_state({"fort": Gym(response)})
+        else:
+            self._update_state({"fort": PokeStop(response)})

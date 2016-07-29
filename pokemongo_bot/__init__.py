@@ -74,45 +74,44 @@ class PokemonGoBot(object):
 
         self._remove_ignored_pokemon(cell)
 
-        if (self.config.mode == "all" or self.config.mode == "poke") and 'catchable_pokemons' in cell and len(cell['catchable_pokemons']) > 0:
+        if (self.config.mode == "all" or self.config.mode == "poke") and len(cell.catchable_pokemon) > 0:
             logger.log('[#] Something rustles nearby!')
             # Sort all by distance from current pos- eventually this should
             # build graph & A* it
-            cell['catchable_pokemons'].sort(key=lambda x: distance(self.position[0], self.position[1], x['latitude'], x['longitude']))
+            cell.catchable_pokemon.sort(key=lambda x: distance(self.position[0], self.position[1], x['latitude'], x['longitude']))
 
             user_web_catchable = 'web/catchable-%s.json' % self.config.username
-            for pokemon in cell['catchable_pokemons']:
+            for pokemon in cell.catchable_pokemons:
+                """
                 with open(user_web_catchable, 'w') as outfile:
                     json.dump(pokemon, outfile)
+                """
 
                 if self.catch_pokemon(pokemon) == PokemonCatchWorker.NO_POKEBALLS:
                     break
-                with open(user_web_catchable, 'w') as outfile:
-                    json.dump({}, outfile)
 
-        if (self.config.mode == "all" or self.config.mode == "poke") and 'wild_pokemons' in cell and len(cell['wild_pokemons']) > 0:
+        if (self.config.mode == "all" or self.config.mode == "poke") and len(cell.wild_pokemon) > 0:
             # Sort all by distance from current pos- eventually this should
             # build graph & A* it
-            cell['wild_pokemons'].sort(key=lambda x: distance(self.position[0], self.position[1], x['latitude'], x['longitude']))
-            for pokemon in cell['wild_pokemons']:
+            cell.wild_pokemon.sort(key=lambda x: distance(self.position[0], self.position[1], x.latitude, x.longitude))
+            for pokemon in cell.wild_pokemons:
                 if self.catch_pokemon(pokemon) == PokemonCatchWorker.NO_POKEBALLS:
                     break
         if include_fort_on_path:
-            if 'forts' in cell:
-                # Only include those with a lat/long
-                forts = [fort for fort in cell['forts'] if 'latitude' in fort and 'type' in fort]
-                # gyms = [gym for gym in cell['forts'] if 'gym_points' in gym]
+            # Only include those with a lat/long
+            pokestops = [pokestop for pokestop in cell.pokestops if pokestop.latitude is not None and pokestop.longitude is not None]
+            # gyms = [gym for gym in cell['forts'] if 'gym_points' in gym]
 
-                # Sort all by distance from current pos- eventually this should
-                # build graph & A* it
-                forts.sort(key=lambda x: distance(self.position[0], self.position[1], x['latitude'], x['longitude']))
-                for fort in forts:
-                    walk_worker = WalkTowardsFortWorker(fort, self)
-                    walk_worker.work()
+            # Sort all by distance from current pos- eventually this should
+            # build graph & A* it
+            pokestops.sort(key=lambda x: distance(self.position[0], self.position[1], x.latitude, x.longitude))
+            for pokestop in pokestops:
+                walk_worker = WalkTowardsFortWorker(pokestop, self)
+                walk_worker.work()
 
-                    if self.config.mode == "all" or self.config.mode == "farm":
-                        spinner_worker = SeenFortWorker(fort, self)
-                        spinner_worker.work()
+                if self.config.mode == "all" or self.config.mode == "farm":
+                    spinner_worker = SeenFortWorker(pokestop, self)
+                    spinner_worker.work()
 
     def catch_pokemon(self, pokemon):
         catch_worker = PokemonCatchWorker(pokemon, self)
@@ -472,27 +471,15 @@ class PokemonGoBot(object):
         if response_dict is False:
             logger.log("Couldn't get player info!", "red")
             return
-        inventory_items = response_dict.get('responses', {}).get('GET_INVENTORY', {}).get('inventory_delta', {}).get('inventory_items')
-        if inventory_items is None:
-            return
-        for item in inventory_items:
-            if item.get("inventory_item_data", {}).get("player_stats") is None:
-                continue
-            player_stats = item['inventory_item_data']['player_stats']
+        player = response_dict["player"]
+        print(player)
 
-            if 'experience' not in player_stats:
-                player_stats['experience'] = 0
+        logger.log('[#] -- Level: {}'.format(player.level))
 
-            if 'level' in player_stats:
-                logger.log('[#] -- Level: {level}'.format(**player_stats))
+        nextlvlxp = player.next_level_xp - player.experience
+        logger.log('[#] -- Experience: {}'.format(player.experience))
+        logger.log('[#] -- Experience until next level: {}'.format(nextlvlxp))
 
-            if 'next_level_xp' in player_stats:
-                nextlvlxp = int(player_stats['next_level_xp']) - int(player_stats['experience'])
-                logger.log('[#] -- Experience: {experience}'.format(**player_stats))
-                logger.log('[#] -- Experience until next level: {}'.format(nextlvlxp))
+        logger.log('[#] -- Pokemon Captured: {}'.format(player.pokemons_captured))
 
-            if 'pokemons_captured' in player_stats:
-                logger.log('[#] -- Pokemon Captured: {pokemons_captured}'.format(**player_stats))
-
-            if 'poke_stop_visits' in player_stats:
-                logger.log('[#] -- Pokestops Visited: {poke_stop_visits}'.format(**player_stats))
+        logger.log('[#] -- Pokestops Visited: {}'.format(player.poke_stop_visits))

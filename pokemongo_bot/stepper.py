@@ -126,17 +126,17 @@ class Stepper(object):
         if response_dict is None:
             return
         # Passing data through last-location and location
-        map_objects = response_dict["worldmap"].data
-        if map_objects is not None:
-            with open("web/location-{}.json".format(self.config.username), "w") as outfile:
-                json.dump({"lat": lat, "lng": lng, "cells": convert_to_utf8(map_objects.get("map_cells"))}, outfile)
-            with open("data/last-location-{}.json".format(self.config.username), "w") as outfile:
-                outfile.truncate()
-                json.dump({"lat": lat, "lng": lng}, outfile)
-            if "status" in map_objects:
-                if map_objects.get("status") is 1:
-                    map_cells = map_objects.get("map_cells")
-                # Sort all by distance from current pos - eventually this should build graph and A* it
-                map_cells.sort(key=lambda x: distance(lat, lng, x["forts"][0]["latitude"], x["forts"][0]["longitude"]) if "forts" in x and x["forts"] != [] else 1e6)
-                for cell in map_cells:
-                    self.bot.work_on_cell(cell, pokemon_only)
+        map_objects = response_dict["worldmap"]
+        """
+        with open("web/location-{}.json".format(self.config.username), "w") as outfile:
+            json.dump({"lat": lat, "lng": lng, "cells": convert_to_utf8(map_objects.get("map_cells"))}, outfile)
+        """
+        with open("data/last-location-{}.json".format(self.config.username), "w") as outfile:
+            outfile.truncate()
+            json.dump({"lat": lat, "lng": lng}, outfile)
+
+        map_cells = map_objects.cells
+        # Sort all by distance from current pos - eventually this should build graph and A* it
+        map_cells.sort(key=lambda x: distance(lat, lng, x.pokestops[0].latitude, x.pokestops[0].longitude) if len(x.pokestops) > 0 else 1e6)
+        for cell in map_cells:
+            self.bot.work_on_cell(cell, pokemon_only)

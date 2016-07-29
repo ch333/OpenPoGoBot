@@ -1,4 +1,5 @@
 from pgoapi import PGoApi
+from pgoapi.exceptions import ServerSideRequestThrottlingException
 from pgoapi.auth_ptc import AuthPtc
 from pgoapi.auth_google import AuthGoogle
 import time
@@ -23,7 +24,7 @@ class PoGoApi(object):
 
     def login(self):
         provider, username, password = self.provider, self.username, self.password
-        return self._api.login(provider, username, password)
+        return self._api.login(provider, username, password, app_simulation=True)
 
         # TODO: Figure out why the below doesn't work
         """
@@ -91,6 +92,9 @@ class PoGoApi(object):
                 return int(field/1000 - time.time())
         return 0
 
+    def create_request(self):
+        return self._api.create_request()
+
     def call(self, ignore_expiration=False, ignore_cache=False):
         methods, method_keys, self._pending_calls, self._pending_calls_keys = self._pending_calls, self._pending_calls_keys, {}, []
         if self.get_expiration_time() < 60 and ignore_expiration is False:
@@ -103,13 +107,22 @@ class PoGoApi(object):
         if len(uncached_method_keys) == 0:
             return self.state.get_state()
 
-        for _ in range(3):
+        for _ in range(10):
+
+            request = self._api.create_request()
+
             for method in uncached_method_keys:
                 my_args, my_kwargs = methods[method]
-                getattr(self._api, method)(*my_args, **my_kwargs)
+                getattr(request, method)(*my_args, **my_kwargs)
 
-            results = self._api.call()
-            if results is False or results is None or results.get('status_code', 0) != 1:
+            try:
+                results = request.call()
+            except ServerSideRequestThrottlingException:
+                print("[API] Requesting too fast. Retrying in 5 seconds...")
+                time.sleep(5)
+                continue
+
+            if results is False or results is None or results.get('status_code', 1) != 1:
                 print("[API] API call failed. Retrying in 5 seconds...")
                 time.sleep(5)
             else:

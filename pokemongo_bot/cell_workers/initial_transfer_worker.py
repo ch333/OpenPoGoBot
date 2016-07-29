@@ -24,7 +24,7 @@ class InitialTransferWorker(object):
 
         for group_id in pokemon_groups:
 
-            group_cp = pokemon_groups[group_id].keys()
+            group_cp = list(pokemon_groups[group_id].keys())
 
             if len(group_cp) > 1:
                 group_cp.sort()
@@ -53,22 +53,21 @@ class InitialTransferWorker(object):
     def _initial_transfer_get_groups(self):
         pokemon_groups = {}
         self.api.get_player().get_inventory()
-        inventory_req = self.api.call()
+        response_dict = self.api.call()
+        inventory, pokemon_list = response_dict['inventory'], response_dict['pokemon']
+        """
         inventory_dict = inventory_req['responses']['GET_INVENTORY']['inventory_delta']['inventory_items']
         with open('web/inventory-%s.json' % (self.config.username), 'w') as outfile:
             json.dump(inventory_dict, outfile)
+        """
 
-        for pokemon in inventory_dict:
-            try:
-                pokemon_data = pokemon['inventory_item_data']['pokemon_data']
-                group_id = pokemon_data['pokemon_id']
-                group_pokemon = pokemon_data['id']
-                group_pokemon_cp = pokemon_data['cp']
+        for pokemon in pokemon_list:
+            group_id = pokemon.pokemon_id
+            group_pokemon = pokemon.unique_id
+            group_pokemon_cp = pokemon.combat_power
 
-                if group_id not in pokemon_groups:
-                    pokemon_groups[group_id] = {}
+            if group_id not in pokemon_groups:
+                pokemon_groups[group_id] = {}
 
-                pokemon_groups[group_id].update({group_pokemon_cp: group_pokemon})
-            except KeyError:
-                continue
+            pokemon_groups[group_id].update({group_pokemon_cp: group_pokemon})
         return pokemon_groups

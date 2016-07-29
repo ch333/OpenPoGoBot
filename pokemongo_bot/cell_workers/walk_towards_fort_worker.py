@@ -17,11 +17,12 @@ class WalkTowardsFortWorker(object):
         self.stepper = bot.stepper
 
     def work(self):
-        lat = self.fort["latitude"]
-        lng = self.fort["longitude"]
+        print(self.fort)
+        lat = self.fort.latitude
+        lng = self.fort.longitude
         unit = self.config.distance_unit  # Unit to use when printing formatted distance
 
-        fort_id = self.fort["id"]
+        fort_id = self.fort.fort_id
         dist = distance(self.position[0], self.position[1], lat, lng)
 
         logger.log("[#] Found fort {} at distance {}".format(fort_id, format_dist(dist, unit)))
@@ -38,12 +39,13 @@ class WalkTowardsFortWorker(object):
             logger.log("[#] Arrived at Pokestop")
             sleep(2)
 
-        self.api.fort_details(fort_id=self.fort["id"],
+        self.api.fort_details(fort_id=fort_id,
                               latitude=lat,
                               longitude=lng)
         response_dict = self.api.call()
         if response_dict is None:
             return
+        print(response_dict['fort'])
         fort_details = response_dict.get("responses", {}).get("FORT_DETAILS", {})
         fort_name = fort_details.get("name") if fort_details.get("name") else "Unknown"
         logger.log(u"[#] Now at Pokestop: " + fort_name)

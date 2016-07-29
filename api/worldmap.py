@@ -2,8 +2,8 @@ class Fort(object):
 
     def __init__(self, data):
         self.fort_id = data.get("id", "")
-        self.latitude = data.get("latitude", 0.0)
-        self.longitude = data.get("longitude", 0.0)
+        self.latitude = data.get("latitude", None)
+        self.longitude = data.get("longitude", None)
         self.enabled = data.get("enabled", 1)
         self.last_modified_timestamp_ms = data.get("last_modified_timestamp_ms", 0)
         self.fort_type = data.get("type", 0)
@@ -73,6 +73,10 @@ class Cell(object):
         for spawn in spawn_points:
             self.spawn_points.append((spawn["latitude"], spawn["longitude"]))
 
+        self.catchable_pokemon = data.get("catchable_pokemons", [])
+        self.nearby_pokemon = data.get("nearby_pokemons", [])
+        self.wild_pokemon = data.get("wild_pokemons", [])
+
         forts = data.get("forts", [])
         for fort in forts:
             if fort.get("type", 2) == 1:
@@ -83,14 +87,12 @@ class Cell(object):
 class WorldMap(object):
 
     def __init__(self):
-        self.cells = {}
+        self.cells = []
 
     def update_map_objects(self, data):
-        self.data = data
-        """
+        #self.data = data
         # Patch this up later
-        cells = data.get("cells", [])
+        cells = data.get("map_cells", [])
         for cell_data in cells:
             cell = Cell(cell_data)
-            self.cells[cell.cell_id] = cell
-        """
+            self.cells.append(cell)
