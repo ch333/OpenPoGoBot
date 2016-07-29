@@ -41,7 +41,7 @@ class Stepper(object):
         sleep(5)
 
     def walk_to(self, speed, lat, lng, alt):
-        position_lat, position_lng, _ = self.api.get_position()
+        position_lat, position_lng, _ = self.api_wrapper.get_position()
 
         # ask google for directions
         if self.config.google_directions and self.config.gmapkey:
@@ -87,7 +87,7 @@ class Stepper(object):
             d_long = (to_lng - from_lng) / steps
 
             for _ in range(int(steps)):
-                position_lat, position_lng, _ = self.api.get_position()
+                position_lat, position_lng, _ = self.api_wrapper.get_position()
                 c_lat = position_lat + d_lat + random_lat_long_delta(delta_factor)
                 c_long = position_lng + d_long + random_lat_long_delta(delta_factor)
                 self.api_wrapper.set_position(c_lat, c_long, alt)

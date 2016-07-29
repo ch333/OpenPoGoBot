@@ -220,45 +220,6 @@ class PokemonGoBot(object):
         ]
         return bool(current_time_list == last_time_list)
 
-    # noinspection PyProtectedMember
-    def check_session(self):
-        # Check session expiry
-        remaining_time = None
-        current = time.gmtime()
-
-        # pylint: disable=protected-access
-        if self.api._auth_provider and self.api._auth_provider._ticket_expire:
-            remaining_time = self.api._auth_provider._ticket_expire / 1000 - time.time()
-        if remaining_time is not None and remaining_time < 30:
-            logger.log("[X] Session stale, re-logging in", 'red')
-            self.login()
-
-        if not self.same_minute(current, self.last_session_check):
-            self.last_session_check = current
-            remaining_time_string = str(datetime.timedelta(seconds=remaining_time))
-            logger.log("[#] Remaining Session Time: %s" % remaining_time_string, 'yellow')
-
-    def login(self):
-        logger.log('[#] Attempting login to Pokemon Go.', 'white')
-        self.api.set_position(*self.position)
-
-        while not self.api.login(self.config.auth_service, str(self.config.username), str(self.config.password)):
-            logger.log('[X] Login Error, server busy', 'red')
-            logger.log('[X] Waiting 10 seconds to try again', 'red')
-            time.sleep(10)
-
-        logger.log('[+] Login to Pokemon Go successful.', 'green')
-        self.api.get_player()
-        response_dict = self.api.call()
-        try:
-            player = response_dict['responses']['GET_PLAYER']['player_data']
-            self.print_player_data(player)
-            self.get_player_info()
-        except TypeError:
-            logger.log("[X] Unable to parse player object from API", 'red')
-            logger.log("Forced Exit!", 'red')
-            exit(1)
-
     def _setup_api(self):
         # instantiate api
         self.api_wrapper = PoGoApi(provider=self.config.auth_service, username=self.config.username,
@@ -271,6 +232,8 @@ class PokemonGoBot(object):
             logger.log('Login Error, server busy', 'red')
             logger.log('Waiting 15 seconds before trying again...')
             time.sleep(15)
+
+        logger.log('[+] Login to Pokemon Go successful.', 'green')
 
         # chain subrequests (methods) into one RPC call
 
@@ -356,8 +319,8 @@ class PokemonGoBot(object):
         #     pass
 
     def drop_item(self, item_id, count):
-        self.api.recycle_inventory_item(item_id=item_id, count=count)
-        self.api.call()
+        self.api_wrapper.recycle_inventory_item(item_id=item_id, count=count)
+        self.api_wrapper.call()
 
     def update_player_and_inventory(self):
         # type: () -> Dict[str, object]
@@ -397,7 +360,7 @@ class PokemonGoBot(object):
                     location_json = json.load(last_location_file)
 
                     self.position = (location_json['lat'], location_json['lng'], 0.0)
-                    self.api.set_position(*self.position)
+                    self.api_wrapper.set_position(*self.position)
 
                     logger.log('')
                     logger.log('[x] Last location flag used. Overriding passed in location')
