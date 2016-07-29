@@ -7,8 +7,9 @@ import googlemaps
 from s2sphere import CellId, LatLng
 from pgoapi.utilities import f2i
 from pokemongo_bot.human_behaviour import sleep, random_lat_long_delta
-from pokemongo_bot.utils import distance, i2f, format_time, convert_to_utf8
+from pokemongo_bot.utils import distance, format_time, convert_to_utf8
 import pokemongo_bot.logger as logger
+
 
 class Stepper(object):
 
@@ -27,13 +28,12 @@ class Stepper(object):
         self.origin_lon = self.bot.position[1]
 
     def take_step(self):
-        position = (0, 0, 0)
         if self.first_step:
             self.first_step = False
             position = (self.origin_lat, self.origin_lon, 0.0)
         else:
             position_lat, position_lng, _ = self.api.get_position()
-            position = (i2f(position_lat), i2f(position_lng), 0.0)
+            position = (position_lat, position_lng, 0.0)
 
         self.api.set_position(*position)
         self._work_at_position(position[0], position[1], True)
@@ -49,7 +49,7 @@ class Stepper(object):
             gmaps = googlemaps.Client(key=self.config.gmapkey)
 
             now = datetime.now()
-            start = "{},{}".format(i2f(position_lat), i2f(position_lng))
+            start = "{},{}".format(position_lat, position_lng)
             end = "{},{}".format(lat, lng)
             directions_result = gmaps.directions(start, end, mode="walking", departure_time=now)
 
@@ -67,14 +67,15 @@ class Stepper(object):
                         )
             else:
                 # If google doesn't know the way, then we just have to go as the crow flies
-                self._do_walk_to(speed, i2f(position_lat), i2f(position_lng), lat, lng, alt, 25)
+                self._do_walk_to(speed, position_lat, position_lng, lat, lng, alt, 25)
 
         else:
-            self._do_walk_to(speed, i2f(position_lat), i2f(position_lng), lat, lng, alt, 25)
+            self._do_walk_to(speed, position_lat, position_lng, lat, lng, alt, 25)
 
         logger.log("[#] Walking Finished")
 
     def _do_walk_to(self, speed, from_lat, from_lng, to_lat, to_lng, alt, delta_factor):
+        # type: (float, float, float, float, float, float, float) -> None
 
         dist = distance(from_lat, from_lng, to_lat, to_lng)
         steps = (dist / (self.AVERAGE_STRIDE_LENGTH_IN_METRES * speed))
@@ -86,21 +87,21 @@ class Stepper(object):
 
             for _ in range(int(steps)):
                 position_lat, position_lng, _ = self.api.get_position()
-                c_lat = i2f(position_lat) + d_lat + random_lat_long_delta(delta_factor)
-                c_long = i2f(position_lng) + d_long + random_lat_long_delta(delta_factor)
+                c_lat = position_lat + d_lat + random_lat_long_delta(delta_factor)
+                c_long = position_lng + d_long + random_lat_long_delta(delta_factor)
                 self.api.set_position(c_lat, c_long, alt)
 
                 self.bot.heartbeat()
                 sleep(1)  # sleep one second plus a random delta
 
                 position_lat, position_lng, _ = self.api.get_position()
-                self._work_at_position(i2f(position_lat), i2f(position_lng), False)
+                self._work_at_position(position_lat, position_lng, False)
 
             self.bot.heartbeat()
 
     def _get_cell_id_from_latlong(self, radius=10):
         position_lat, position_lng, _ = self.api.get_position()
-        origin = CellId.from_lat_lng(LatLng.from_degrees(i2f(position_lat), i2f(position_lng))).parent(15)
+        origin = CellId.from_lat_lng(LatLng.from_degrees(position_lat, position_lng)).parent(15)
         walk = [origin.id()]
 
         # 10 before and 10 after
@@ -125,7 +126,7 @@ class Stepper(object):
         if response_dict is None:
             return
         # Passing data through last-location and location
-        map_objects = response_dict.get("responses", {}).get("GET_MAP_OBJECTS")
+        map_objects = response_dict["worldmap"].data
         if map_objects is not None:
             with open("web/location-{}.json".format(self.config.username), "w") as outfile:
                 json.dump({"lat": lat, "lng": lng, "cells": convert_to_utf8(map_objects.get("map_cells"))}, outfile)
